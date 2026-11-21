@@ -324,9 +324,18 @@ async function convert(load) {
   }
 }
 
+const YOUTUBE_LINK = /(youtube\.com|youtu\.be)\//i;
+
 function startPlaylist() {
   const url = $("url").value.trim();
   if (!url) return showError("Paste a Spotify playlist link first.");
+  if (YOUTUBE_LINK.test(url)) {
+    // A YouTube link belongs on the other tab: move it there.
+    $("url").value = "";
+    setTarget("spotify");
+    $("links").value = url;
+    return connected ? startImport() : showError("Connect Spotify, then press the button below to add these songs.");
+  }
   try { localStorage.setItem("lastPlaylist", url); } catch (error) {}
   convert(() => api("/api/playlist?url=" + encodeURIComponent(url)));
 }
@@ -346,7 +355,11 @@ $("url").onpaste = () => setTimeout(() => { if (!$("convert").disabled) startPla
 $("queue").onclick = () => convert(() => api("/api/queue"));
 $("import").onclick = startImport;
 document.querySelectorAll(".connect").forEach(button => { button.onclick = () => { location.href = "/login"; }; });
-try { $("url").value = localStorage.getItem("lastPlaylist") || ""; } catch (error) {}
+try {
+  // Only bring back a Spotify link, never something else that was pasted here.
+  const last = localStorage.getItem("lastPlaylist") || "";
+  $("url").value = last.includes("spotify.com") ? last : "";
+} catch (error) {}
 refreshStatus().catch(() => {});
 </script>
 </body>

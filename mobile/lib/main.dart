@@ -138,6 +138,20 @@ class _HomePageState extends State<HomePage> {
           : 'Paste at least one YouTube link first.');
       return;
     }
+    // A link for the other direction: switch tabs and keep the link.
+    final isYoutube = RegExp(r'(youtube\.com|youtu\.be)/', caseSensitive: false).hasMatch(text);
+    final isSpotify = text.contains('open.spotify.com/');
+    if (_target == Target.youtube && isYoutube && !isSpotify) {
+      _setTarget(Target.spotify);
+      _input.text = text;
+      if (!_auth.connected) {
+        setState(() => _error = 'That is a YouTube link, so it moved here. Connect Spotify to add the songs.');
+        return;
+      }
+    } else if (_target == Target.spotify && isSpotify && !isYoutube) {
+      _setTarget(Target.youtube);
+      _input.text = text;
+    }
     _start(() => _target == Target.youtube ? spotifyPlaylistTracks(text) : _youtube.tracksFromLinks(text));
   }
 
