@@ -2,3 +2,21 @@ __pycache__/
 *.pyc
 .spotify_token
 .env
+
+# Build outputs and installers
+*.apk
+*.aab
+build/
+mobile/build/
+mobile/.dart_tool/
+mobile/android/.gradle/
+mobile/android/local.properties
+
+# Secrets: Spotify credentials, tokens, signing keys
+.env
+.env.*
+*.token
+.cache*
+*.jks
+*.keystore
+key.properties
