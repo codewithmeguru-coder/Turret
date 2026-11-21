@@ -62,13 +62,19 @@ class YoutubeService {
   }
 
   /// The songs of a saved YouTube playlist, read from its page (first 100 videos).
-  Future<List<String>> _playlistLabels(String playlistId) async {
+  /// YouTube Mixes (RD... lists) have no playlist page, so they are read from a watch page.
+  Future<List<String>> _playlistLabels(String playlistId, String link) async {
     final labels = <String>[];
+    final mixLabels = <String>[]; // a watch page's queue; its side videos are only suggestions
     try {
-      final response = await http.get(
-        Uri.https('www.youtube.com', '/playlist', {'list': playlistId}),
-        headers: _headers,
-      );
+      Uri page = Uri.https('www.youtube.com', '/playlist', {'list': playlistId});
+      if (playlistId.startsWith('RD')) {
+        final rest = playlistId.substring(2);
+        final seed = RegExp(r'(?:v=|youtu\.be/)([\w-]{11})').firstMatch(link)?.group(1) ??
+            rest.substring(rest.length > 11 ? rest.length - 11 : 0);
+        page = Uri.https('www.youtube.com', '/watch', {'v': seed, 'list': playlistId});
+      }
+      final response = await http.get(page, headers: _headers);
       final data = RegExp(r'var ytInitialData = (\{.*?\});</script>', dotAll: true)
           .firstMatch(utf8.decode(response.bodyBytes, allowMalformed: true))!
           .group(1)!;
@@ -76,6 +82,14 @@ class YoutubeService {
         if (node is List) {
           node.forEach(walk);
         } else if (node is Map) {
+          final panel = node['playlistPanelVideoRenderer'];
+          if (panel is Map) {
+            final t = panel['title'];
+            final title = t?['simpleText'] ?? (t?['runs'] as List?)?.first['text'];
+            final by = (panel['shortBylineText']?['runs'] as List?)?.first['text'];
+            if (title is String) mixLabels.add(songLabel(title, by is String ? by : ''));
+            return;
+          }
           final video = node['lockupViewModel'];
           if (video is Map && video['contentType'] == 'LOCKUP_CONTENT_TYPE_VIDEO') {
             final meta = video['metadata']?['lockupMetadataViewModel'];
@@ -94,7 +108,7 @@ class YoutubeService {
     } catch (_) {
       // An unreadable playlist just yields no songs.
     }
-    return labels;
+    return mixLabels.isNotEmpty ? mixLabels : labels;
   }
 
   /// Reads songs from pasted YouTube links: videos, saved playlists, or this app's play link.
@@ -110,7 +124,7 @@ class YoutubeService {
       final playlist = RegExp(r'[?&]list=([\w-]+)').firstMatch(line)?.group(1);
       // Includes TL... lists: the temporary playlist YouTube makes for a watch_videos link or a share.
       if (playlist != null) {
-        final fromPlaylist = await _playlistLabels(playlist);
+        final fromPlaylist = await _playlistLabels(playlist, line);
         if (fromPlaylist.isNotEmpty) {
           labels.addAll(fromPlaylist);
           continue;

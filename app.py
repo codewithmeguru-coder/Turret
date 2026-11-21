@@ -137,6 +137,15 @@ def video_label(video_id):
         return None
 
 
+def playlist_url(list_id, link):
+    """YouTube Mixes (RD... lists) have no playlist page; they open from a watch page instead."""
+    if not list_id.startswith("RD"):
+        return f"https://www.youtube.com/playlist?list={list_id}"
+    video = re.search(r"(?:v=|youtu\.be/)([\w-]{11})", link)
+    seed = video.group(1) if video else list_id[2:][-11:]
+    return f"https://www.youtube.com/watch?v={seed}&list={list_id}"
+
+
 def youtube_tracks(text):
     """Read songs from pasted YouTube links: videos, saved playlists, or this app's play link."""
     video_ids, labels = [], []
@@ -148,8 +157,8 @@ def youtube_tracks(text):
         # Includes TL... lists: the temporary playlist YouTube makes for a watch_videos link or a share.
         if playlist:
             try:
-                with YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True}) as ydl:
-                    info = ydl.extract_info(f"https://www.youtube.com/playlist?list={playlist.group(1)}", download=False)
+                with YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True, "playlistend": 100}) as ydl:
+                    info = ydl.extract_info(playlist_url(playlist.group(1), line), download=False)
                 found = [song_label(e.get("title"), e.get("channel") or e.get("uploader"))
                          for e in info.get("entries") or [] if e.get("title")]
                 if found:
