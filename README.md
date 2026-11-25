@@ -4,7 +4,7 @@ Move songs between Spotify and YouTube, on your computer or your Android phone. 
 
 ## What it does
 
-- **Spotify → YouTube:** paste a public Spotify playlist link. The app finds each song on YouTube, lets you skip wrong matches, and opens YouTube with the songs queued.
+- **Spotify → YouTube:** paste a public Spotify playlist link. The app finds each song on YouTube, lets you skip wrong matches, and opens YouTube with the songs queued. Switch step 3 to **Show link** to get the link with a Copy button instead, so you can paste it into any browser yourself; the choice is remembered.
 - **YouTube → Spotify:** paste YouTube links. The app finds each song on Spotify and creates a private playlist in your account. This needs a Spotify developer app (see below). It reads:
   - single videos (`youtube.com/watch?v=…`, `youtu.be/…`, Shorts)
   - saved playlists (`youtube.com/playlist?list=…`)

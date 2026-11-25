@@ -57,6 +57,14 @@
   #play { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; align-items: center; }
   #play .btn, #play button { font-size: 16px; padding: 12px 22px; }
   #play input { flex: 0 1 200px; }
+  .mode { display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 3px; }
+  .mode button { border: 0; padding: 5px 12px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .mode button[aria-pressed=true] { background: var(--accent); color: var(--accent-text); }
+  #play.links { flex: 1 1 100%; flex-direction: column; align-items: stretch; max-height: 40vh; overflow-y: auto; margin-left: 0; }
+  #play .linkrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #play .linkrow span { font-size: 13px; color: var(--muted); flex: none; }
+  #play .linkrow input { flex: 1 1 240px; font: 13px ui-monospace, Consolas, monospace; padding: 10px 12px; }
+  #play .linkrow button { font-size: 14px; padding: 10px 16px; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -116,6 +124,10 @@
 <div id="playbar" hidden>
   <div class="inner">
     <h2 class="step"><span class="num">3</span><span id="playTitle"></span></h2>
+    <div class="mode" id="mode" role="group" aria-label="When the songs are ready">
+      <button data-mode="open">Open YouTube</button>
+      <button data-mode="link">Show link</button>
+    </div>
     <div id="play"></div>
   </div>
 </div>
@@ -133,6 +145,8 @@ let rows = [];
 let run = 0;
 let connected = false;
 let created = null;       // link to the Spotify playlist once made
+let resultMode = "open";  // Spotify → YouTube: "open" plays on YouTube, "link" shows the link to copy
+try { if (localStorage.getItem("youtubeResult") === "link") resultMode = "link"; } catch (error) {}
 
 async function api(path, body) {
   const response = await fetch(path, body === undefined ? undefined : {
@@ -206,14 +220,21 @@ function render() {
 
   const play = $("play");
   play.replaceChildren();
+  play.classList.toggle("links", target === "youtube" && resultMode === "link");
   $("playbar").hidden = !finished || !ids.length;
+  $("mode").hidden = target !== "youtube";
+  document.querySelectorAll("#mode button").forEach(button => {
+    button.setAttribute("aria-pressed", button.dataset.mode === resultMode);
+  });
   if (target === "youtube") {
-    $("playTitle").textContent = ids.length > CHUNK ? "Play on YouTube, 50 at a time" : "Ready";
+    const many = ids.length > CHUNK;
+    $("playTitle").textContent = resultMode === "link" ? (many ? "Your links, 50 songs each" : "Your link")
+      : many ? "Play on YouTube, 50 at a time" : "Ready";
     for (let i = 0; i < ids.length; i += CHUNK) {
-      play.append(link(
-        "https://www.youtube.com/watch_videos?video_ids=" + ids.slice(i, i + CHUNK).join(","),
-        ids.length <= CHUNK ? `▶ Play ${ids.length} songs on YouTube` : `▶ Songs ${i + 1}–${Math.min(i + CHUNK, ids.length)}`,
-        "btn primary"));
+      const url = "https://www.youtube.com/watch_videos?video_ids=" + ids.slice(i, i + CHUNK).join(",");
+      const range = `Songs ${i + 1}–${Math.min(i + CHUNK, ids.length)}`;
+      if (resultMode === "link") play.append(linkRow(url, many ? range : ""));
+      else play.append(link(url, many ? "▶ " + range : `▶ Play ${ids.length} songs on YouTube`, "btn primary"));
     }
   } else if (created) {
     $("playTitle").textContent = `Playlist created with ${created.count} songs`;
@@ -241,6 +262,38 @@ function render() {
     };
     play.append(name, create);
   }
+}
+
+// A play link shown as text, with a button that copies it.
+function linkRow(url, label) {
+  const row = document.createElement("div");
+  row.className = "linkrow";
+  if (label) {
+    const span = document.createElement("span");
+    span.textContent = label;
+    row.append(span);
+  }
+  const field = document.createElement("input");
+  field.type = "text";
+  field.readOnly = true;
+  field.value = url;
+  field.setAttribute("aria-label", label ? `YouTube link, ${label}` : "YouTube link");
+  field.onfocus = () => field.select();
+  const copy = document.createElement("button");
+  copy.className = "primary";
+  copy.textContent = "Copy link";
+  copy.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (error) {
+      field.select();
+      document.execCommand("copy");
+    }
+    copy.textContent = "Copied ✓";
+    setTimeout(() => { copy.textContent = "Copy link"; }, 2000);
+  };
+  row.append(field, copy);
+  return row;
 }
 
 function addRow(row, index) {
@@ -354,6 +407,13 @@ $("url").onkeydown = event => { if (event.key === "Enter") startPlaylist(); };
 $("url").onpaste = () => setTimeout(() => { if (!$("convert").disabled) startPlaylist(); }, 0);
 $("queue").onclick = () => convert(() => api("/api/queue"));
 $("import").onclick = startImport;
+document.querySelectorAll("#mode button").forEach(button => {
+  button.onclick = () => {
+    resultMode = button.dataset.mode;
+    try { localStorage.setItem("youtubeResult", resultMode); } catch (error) {}
+    render();
+  };
+});
 document.querySelectorAll(".connect").forEach(button => { button.onclick = () => { location.href = "/login"; }; });
 try {
   // Only bring back a Spotify link, never something else that was pasted here.

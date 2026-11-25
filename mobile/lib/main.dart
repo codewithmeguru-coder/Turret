@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'play_bar.dart';
 import 'spotify.dart';
 import 'spotify_auth.dart';
 import 'youtube.dart';
@@ -41,7 +42,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const _chunk = 50; // YouTube's link takes at most 50 videos
   static const _parallel = 4; // searches running at once
 
   final _auth = SpotifyAuth();
@@ -56,6 +56,7 @@ class _HomePageState extends State<HomePage> {
   bool _creating = false;
   String? _error;
   String? _createdUrl;
+  YoutubeResult _youtubeResult = YoutubeResult.open;
   int _run = 0;
 
   @override
@@ -63,6 +64,9 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _auth.load().then((_) {
       if (mounted) setState(() {});
+    });
+    loadYoutubeResult().then((result) {
+      if (mounted) setState(() => _youtubeResult = result);
     });
   }
 
@@ -412,27 +416,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _playBar(List<String> ids) {
-    if (ids.length <= _chunk) {
-      return FilledButton.icon(
-        onPressed: () => _open(youtubePlayLink(ids)),
-        icon: const Icon(Icons.play_arrow),
-        label: Text('Play ${ids.length} songs on YouTube'),
+  Widget _playBar(List<String> ids) => PlayBar(
+        ids: ids,
+        mode: _youtubeResult,
+        onOpen: _open,
+        onModeChanged: (result) {
+          setState(() => _youtubeResult = result);
+          saveYoutubeResult(result);
+        },
       );
-    }
-    return Wrap(
-      spacing: 8,
-      alignment: WrapAlignment.center,
-      children: [
-        for (var start = 0; start < ids.length; start += _chunk)
-          FilledButton.icon(
-            onPressed: () => _open(youtubePlayLink(ids.skip(start).take(_chunk).toList())),
-            icon: const Icon(Icons.play_arrow),
-            label: Text('${start + 1}–${(start + _chunk).clamp(0, ids.length)}'),
-          ),
-      ],
-    );
-  }
 
   Widget _createBar(List<String> ids) {
     if (_createdUrl != null) {
